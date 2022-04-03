@@ -32,6 +32,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "3", UIMin = "3"))
 		int32 WireCylinderSectorCount = 6;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", UIMin = "1"))
+		float WireCylinderRadius = 5;
 
 	virtual bool ShouldTickIfViewportsOnly() const override;
 

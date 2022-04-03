@@ -58,43 +58,43 @@ void AWireActor::GenerateCylinderMesh()
 			TArray<FLinearColor> vertexColors;
 			TArray<FVector2D> UV0;
 
-			float CylinderRadius = 10;
-			int CylinderFaceCount = WireCylinderSectorCount;
-			TArray<FVector2D> Face2dVerticesArray;
+			float CylinderRadius = WireCylinderRadius;
+			const int CylinderFaceCount = WireCylinderSectorCount;
+			TArray<FVector> FaceVerticesArray;
 
 			for (int CellIndex = 0; CellIndex < WireCellCount; CellIndex++)
 			{
-				FVector RelativeStartWireVector = ((WireStartPoint->GetComponentLocation() - WireEndPoint->GetComponentLocation()) / WireCellCount) * CellIndex
-					+ WireEndPoint->GetComponentLocation()
-					- WirePointLocation[CellIndex]
-					+ ((WireStartPoint->GetRelativeLocation() - WireEndPoint->GetRelativeLocation()) / WireCellCount) * CellIndex;
+				const FVector RelativeLocationOffset = (WireStartPoint->GetComponentLocation() - WireEndPoint->GetComponentLocation()) / WireCellCount;
 
-				int EndCellIndex = (CellIndex + 1) > WireCellCount ? CellIndex : (CellIndex + 1);
-				FVector RelativeEndWireVector = ((WireStartPoint->GetComponentLocation() - WireEndPoint->GetComponentLocation()) / WireCellCount) * EndCellIndex
-					+ WireEndPoint->GetComponentLocation()
-					- WirePointLocation[EndCellIndex]
-					+ ((WireStartPoint->GetRelativeLocation() - WireEndPoint->GetRelativeLocation()) / WireCellCount) * EndCellIndex;
-
-				float DeltaAngle = (WireEndPoint->GetRelativeLocation().Y / WireEndPoint->GetRelativeLocation().X);
-				DeltaAngle = FMath::Atan(DeltaAngle);
+				FVector RelativeStartWireVector = 
+					RelativeLocationOffset * CellIndex + WireEndPoint->GetComponentLocation() - WirePointLocation[CellIndex] + RelativeLocationOffset * CellIndex;
+				
+				const int EndCellIndex = (CellIndex + 1) > WireCellCount ? CellIndex : (CellIndex + 1);
+				
+				FVector RelativeEndWireVector = 
+					RelativeLocationOffset * EndCellIndex + WireEndPoint->GetComponentLocation() - WirePointLocation[EndCellIndex] + RelativeLocationOffset * EndCellIndex;
+				// get Angle between two points of wire;
+				float DeltaAngle = -FMath::Atan((RelativeStartWireVector - RelativeEndWireVector).Y / (RelativeStartWireVector - RelativeEndWireVector).X);
 
 				for (int FaceIndex = 0; FaceIndex <= CylinderFaceCount; FaceIndex++)
 				{
 					// find face points;
 					float PieceFaceAngle = 360.0f / CylinderFaceCount * FaceIndex;
 					PieceFaceAngle = FMath::DegreesToRadians(PieceFaceAngle);
-					float FacePointZ = CylinderRadius * FMath::Cos(PieceFaceAngle);
-					float FacePointY = CylinderRadius * FMath::Sin(PieceFaceAngle);
-					Face2dVerticesArray.Add(FVector2D(FacePointY, FacePointZ));
+					float FacePointZ = CylinderRadius * FMath::Sin(PieceFaceAngle);
+					float FacePointY = CylinderRadius * FMath::Cos(PieceFaceAngle);
+
+					float FacePointX = FacePointY * FMath::Sin(DeltaAngle);
+					FaceVerticesArray.Add(FVector(FacePointX, FacePointY, FacePointZ));
 				}
 
 				//Make SingleCylinre
 
-				for (FVector2D Vector2d : Face2dVerticesArray)
+				for (FVector Vector : FaceVerticesArray)
 				{
-					FVector Vector1 = FVector(0, Vector2d.Y, Vector2d.X) - RelativeStartWireVector;
+					FVector Vector1 = Vector - RelativeStartWireVector;
 					Vertices.Add(Vector1);
-					FVector Vector2 = FVector(0, Vector2d.Y, Vector2d.X) - RelativeEndWireVector;
+					FVector Vector2 = Vector - RelativeEndWireVector;
 					Vertices.Add(Vector2);
 				}
 				for (int i = 0; i < Vertices.Num(); i++)
@@ -109,7 +109,8 @@ void AWireActor::GenerateCylinderMesh()
 							Triangles.Add(i + 1);
 							Triangles.Add(i + 3);
 							Triangles.Add(i + 2);
-
+							
+							// recreate this
 							UV0.Add(FVector2D(0, 0));
 							UV0.Add(FVector2D(10, 0));
 							UV0.Add(FVector2D(0, 10));
@@ -174,16 +175,17 @@ void AWireActor::UpdateWireWorldLocation()
 		WirePointLocation[i] = ((WireStartPoint->GetComponentLocation() - WireEndPoint->GetComponentLocation()) / WireCellCount) * i + WireEndPoint->GetComponentLocation();
 
 		// Calculate gravity function for wire y = ax^2 + bx +c, b = 0
-		int32 GravityScale = WireGravityScale;
+		const int32 GravityScale = WireGravityScale;
 
-		float MinGravityX = GravityScale * 2.0f / WireCellCount;
-		float GravityX = (i - (WireCellCount / 2.0f)) * MinGravityX;
-		float GravityY = - i;
-		float GravityDefenition = GravityX * GravityX - GravityScale * GravityScale;
+		const float MinGravityX = GravityScale * 2.0f / WireCellCount;
+		const float GravityX = (i - (WireCellCount / 2.0f)) * MinGravityX;
+		const float GravityY = - i;
+		const float GravityDefenition = GravityX * GravityX - GravityScale * GravityScale;
 
 		FVector EndTracePoint = FVector(WirePointLocation[i].X, WirePointLocation[i].Y, WirePointLocation[i].Z + GravityDefenition);
 		FCollisionQueryParams QueryParams;
 		QueryParams.AddIgnoredActor(this);
+		
 		GetWorld()->LineTraceSingleByChannel(HitResult, WirePointLocation[i], EndTracePoint, ECollisionChannel::ECC_Visibility, QueryParams);
 
 		if (HitResult.bBlockingHit)
